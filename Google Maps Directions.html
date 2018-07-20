@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+        <meta charset="utf-8" />
+        <style type="text/css">
+              html { height: 100% }
+              body { height: 100%; margin: 5px; }
+              #MapDiv { width: 100%; height: 95%; }
+			  #MapContainerDiv { padding:10px; float:left; width: 55%; height: 600px;}
+			  #DirectionsContainerDiv { padding:5px; float:right; width: 40%; height: 600px;}
+			  #DirectionsListDiv {overflow-y: auto; max-height:300px;}
+			  ul.addressList {list-style-type:circle;}
+        </style>
+        <!-- Include Google Maps JS API -->
+        <script type="text/javascript"
+          src="https://maps.googleapis.com/maps/api/js?key=AIzaSyDtF2iRDC_l6WHVqIZd8AzC0NU-rCOz-fM&libraries=places&sensor=false">
+        </script>
+
+  <!-- Map creation is here -->
+        <script type="text/javascript">
+              var map;
+			  var popup;
+			  var geocoder;
+			  var markers;
+			  var directionsService;
+			  var directionsRenderer;
+			  var autocomplete;
+
+              function initMap() {
+					popup = new google.maps.InfoWindow();
+					
+					geocoder = new google.maps.Geocoder();
+					
+					markers = [];
+					
+					directionsService = new google.maps.DirectionsService();
+					
+					directionsRenderer = new google.maps.DirectionsRenderer();
+					
+                    google.maps.visualRefresh = true;
+
+                    var mapOptions = {
+                          center: new google.maps.LatLng(19.4019437, -99.17330439999999),
+                          zoom: 10,
+                          mapTypeId: google.maps.MapTypeId.ROADMAP
+                    };
+
+                    var mapElement = document.getElementById("MapDiv");
+                    // var input = document.getElementById('pac-input');
+                    var addressField = document.getElementById('addressField');
+					autocomplete = new google.maps.places.Autocomplete(addressField);
+
+                    map = new google.maps.Map(mapElement, mapOptions);
+					
+					directionsRenderer.setMap(map);
+					directionsRenderer.setPanel(document.getElementById('DirectionsListDiv'));			
+				}
+			
+				function pinpointResult(result) {
+
+					var place = autocomplete.getPlace();
+					console.log( place );
+					console.log( JSON.stringify(place) );
+                    var placesForm = document.getElementById("placesForm");
+
+
+
+
+                    var address = place.address_components;
+					var city, state, zip;
+					address.forEach(function(component) {
+					  var types = component.types;
+					  if (types.indexOf('locality') > -1) {
+					    city = component.long_name;
+					  }
+
+					  if (types.indexOf('administrative_area_level_1') > -1) {
+					    state = component.long_name;
+					  }
+
+					  if (types.indexOf('postal_code') > -1) {
+					    zip = component.long_name;
+					  }
+					});
+
+					placesForm.innerHTML = "Ciudad: "+city+"<br>Estado:"+state+"<br>Código postal:"+zip;
+
+
+					var marker = new google.maps.Marker({
+						map: map,
+						position: result.geometry.location,
+						zIndex: -10
+					});
+					
+					map.setCenter(result.geometry.location);
+					map.setZoom(16);
+
+					google.maps.event.addListener(marker, 'click', function() {
+						var popupContent = '<b>Dirección: </b> ' + result.formatted_address;
+						popup.setContent(popupContent);
+						popup.open(map, this);
+					});
+					
+					markers.push(marker);
+				}
+				
+				function listAddresses()
+				{
+					var addressField = document.getElementById('addressField');
+					var addressList = document.getElementById('addressList');
+					if (addressList.children.length == 0)
+					{
+						var placesText = document.getElementById('placesText');
+						placesText.innerHTML = 'Lugares: ';
+					}
+					var LatLang = pinAddressOnMap(addressField.value);
+
+
+					var listItem = document.createElement('li');
+					listItem.innerHTML = addressField.value+' '+LatLang;
+					listItem.addEventListener('click', function(){
+						pinAddressOnMap(listItem.innerHTML);
+					});
+					addressList.appendChild(listItem);
+					
+					
+					if (addressList.children.length > 1)
+					{
+						var getDirectionsBtn = document.getElementById('getDirectionsBtn');
+						getDirectionsBtn.disabled = false;
+					}
+					
+					addressField.value = '';
+				}
+				
+				function pinAddressOnMap(addressText)
+				{
+					var LatLang = '';
+					geocoder.geocode({ 'address': addressText}, function(results, status) {
+      					if (status == google.maps.GeocoderStatus.OK) {
+        					pinpointResult(results[0]);
+        					alert( results[0].geometry.location.lat() + ', ' + results[0].geometry.location.lng() );
+        					console.log( results[0].geometry.location.lat() + ', ' + results[0].geometry.location.lng() );
+      					} else {
+        					alert('Imposible emplear geocode debido a: ' + status);
+      					}
+    				});
+    				return LatLang;
+				}
+				
+				function getDirections()
+				{
+					var waypnts = [];
+					var directionRequest;
+					
+			
+					if (markers.length > 2)
+					{
+						for (var i=1, l=markers.length;i<=l-2;i++)
+						{
+							waypnts.push({
+								location: markers[i].getPosition(),
+								stopover: true
+							});
+						}
+					
+						directionRequest = {
+							origin:markers[0].getPosition(),
+							destination:markers[markers.length-1].getPosition(),
+							waypoints: waypnts,
+							travelMode: google.maps.TravelMode.DRIVING
+						};						
+					}
+					else
+					{
+						directionRequest = {
+							origin:markers[0].getPosition(),
+							destination: markers[markers.length-1].getPosition(),
+							travelMode: google.maps.TravelMode.DRIVING
+						};
+					}
+					
+					directionsService.route(directionRequest, function(result, status) {
+						if (status == google.maps.DirectionsStatus.OK) {
+							directionsRenderer.setDirections(result);
+						}
+						else
+						{
+							alert('Dirección no encontrada: ' + status);
+						}
+					});
+				}
+				
+        </script>
+    </head>
+    <body onload="initMap()">
+    	<div id="ContainerDiv">
+			<div id="MapContainerDiv">
+				<b></b>
+				<div id="MapDiv">
+				</div>
+			</div>
+			<div id="DirectionsContainerDiv">
+				<div id="PlacesContainerDiv">
+					<b>Dirección: </b></br>
+					<input id="addressField" type="text" size="30"  placeholder="..." />
+					<input type="button" id ="pinAddressOnMapBtn" value="Pin en el mapa" onclick="listAddresses()" />
+					<input type="button" id = "getDirectionsBtn" disabled value="Obtener ruta" onclick="getDirections()" />
+					<p id="placesForm"></p>
+					<p id="placesText"></p>
+					<ul id="addressList" class="addressList">
+					</ul>
+				</div>
+				<div id="DirectionsListContainerDiv">
+					<div id="DirectionsListDiv">
+					</div>
+				</div>
+			</div>
+    	</div>
+    </body>
+</html>
